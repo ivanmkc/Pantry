@@ -8,35 +8,35 @@
 
 import Foundation
 
-/** 
- # Pantry 
-
- Pantry is a lightweight way to persist structs containing user data, 
+/**
+ # Pantry
+ 
+ Pantry is a lightweight way to persist structs containing user data,
  cached content or other relevant objects for later retrieval.
  
  ### Storage sample
-
+ 
  ```swift
  let someCustomStruct = SomeCustomStruct(...)
  Pantry.pack(someCustomStruct, "user_data")
  ```
-
+ 
  ### Retrieval sample
-
+ 
  ```swift
  if let unpackedCustomStruct: SomeCustomStruct = Pantry.unpack("user_data") {
-    eprint("got my data out", unpackedCustomStruct)
+ eprint("got my data out", unpackedCustomStruct)
  } else {
-    print("there was no struct data to get")
+ print("there was no struct data to get")
  }
  ```
  */
 open class Pantry {
     // Set to a string identifier to enable in memory mode with no persistent caching. Useful for unit testing.
     open static var enableInMemoryModeWithIdentifier: String?
-
+    
     // MARK: pack generics
-
+    
     /**
      Packs a generic struct that conforms to the `Storable` protocol
      - parameter object: Generic object that will be stored
@@ -48,7 +48,16 @@ open class Pantry {
         
         warehouse.write(object.toDictionary() as Any, expires: expires)
     }
-
+    
+    /**
+     Packs a dictionary
+     */
+    open static func pack(_ object: Any, key: String, expires: StorageExpiry = .never) {
+        let warehouse = getWarehouse(key)
+        
+        warehouse.write(object as Any, expires: expires)
+    }
+    
     /**
      Packs a generic collection of structs that conform to the `Storable` protocol
      - parameter objects: Generic collection of objects that will be stored
@@ -61,10 +70,10 @@ open class Pantry {
         for object in objects {
             result.append(object.toDictionary() as Any)
         }
-
+        
         warehouse.write(result as Any, expires: expires)
     }
-
+    
     /**
      Packs a default storage type.
      - parameter object: Default object that will be stored
@@ -78,12 +87,12 @@ open class Pantry {
         
         warehouse.write(object as Any, expires: expires)
     }
-
+    
     /**
      Packs a collection of default storage types.
      - parameter objects: Collection of objects that will be stored
      - parameter key: The object's key
-
+     
      - SeeAlso: `StorableDefaultType`
      */
     open static func pack<T: StorableDefaultType>(_ objects: [T], key: String, expires: StorageExpiry = .never) {
@@ -96,12 +105,12 @@ open class Pantry {
         
         warehouse.write(result as Any, expires: expires)
     }
-
+    
     /**
      Packs a collection of optional default storage types.
      - parameter objects: Collection of optional objects that will be stored
      - parameter key: The object's key
-
+     
      - SeeAlso: `StorableDefaultType`
      */
     open static func pack<T: StorableDefaultType>(_ objects: [T?], key: String, expires: StorageExpiry = .never) {
@@ -114,20 +123,33 @@ open class Pantry {
         
         warehouse.write(result as Any, expires: expires)
     }
-
-
+    
+    
     // MARK: unpack generics
     
     /**
-    Unpacks a generic struct that conforms to the `Storable` protocol
-    - parameter key: The object's key
-    - returns: T?
-    */
+     Unpacks a generic struct that conforms to the `Storable` protocol
+     - parameter key: The object's key
+     - returns: T?
+     */
     open static func unpack<T: Storable>(_ key: String) -> T? {
         let warehouse = getWarehouse(key)
         
         if warehouse.cacheExists() {
             return T(warehouse: warehouse)
+        }
+        
+        return nil
+    }
+    
+    /**
+     Unpacks a dictionary
+     */
+    open static func unpack(_ key: String) -> Any? {
+        let warehouse = getWarehouse(key)
+        
+        if warehouse.cacheExists() {
+            return warehouse.loadCache()
         }
         
         return nil
@@ -140,10 +162,10 @@ open class Pantry {
      */
     open static func unpack<T: Storable>(_ key: String) -> [T]? {
         let warehouse = getWarehouse(key)
-
+        
         guard warehouse.cacheExists(),
             let cache = warehouse.loadCache() as? Array<Any> else {
-            return nil
+                return nil
         }
         
         var unpackedItems = [T]()
@@ -159,7 +181,7 @@ open class Pantry {
      Unpacks a collection of default storage types.
      - parameter key: The object's key
      - returns: [T]?
-
+     
      - SeeAlso: `StorableDefaultType`
      */
     open static func unpack<T: StorableDefaultType>(_ key: String) -> [T]? {
@@ -180,27 +202,27 @@ open class Pantry {
     /**
      Unacks a default storage type.
      - parameter key: The object's key
-
+     
      - SeeAlso: `StorableDefaultType`
      */
     open static func unpack<T: StorableDefaultType>(_ key: String) -> T? {
         let warehouse = getWarehouse(key)
-
+        
         guard warehouse.cacheExists(),
             let cache = warehouse.loadCache() as? T else {
                 return nil
         }
-
+        
         return cache
     }
-
+    
     /**
      Expire a given object
      - parameter key: The object's key
      */
     open static func expire(_ key: String) {
         let warehouse = getWarehouse(key)
-
+        
         warehouse.removeCache()
     }
     
@@ -212,18 +234,18 @@ open class Pantry {
         MemoryWarehouse.removeAllCache()
         JSONWarehouse.removeAllCache()
     }
-
+    
     open static func itemExistsForKey(_ key: String) -> Bool {
         let warehouse = getWarehouse(key)
         return warehouse.cacheExists()
     }
-
+    
     static func unpack<T: Storable>(_ dictionary: [String: Any]) -> T? {
         let warehouse = getWarehouse(dictionary as Any)
         
         return T(warehouse: warehouse)
     }
-
+    
     static func getWarehouse(_ forKey: String) -> Warehouseable & WarehouseCacheable {
         if let inMemoryIdentifier = Pantry.enableInMemoryModeWithIdentifier {
             return MemoryWarehouse(key: forKey, inMemoryIdentifier: inMemoryIdentifier)
@@ -231,7 +253,7 @@ open class Pantry {
             return JSONWarehouse(key: forKey)
         }
     }
-
+    
     static func getWarehouse(_ forContext: Any) -> Warehouseable {
         if let inMemoryIdentifier = Pantry.enableInMemoryModeWithIdentifier {
             return MemoryWarehouse(context: forContext, inMemoryIdentifier: inMemoryIdentifier)
